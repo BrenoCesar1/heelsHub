@@ -90,7 +90,7 @@ nohup python bots/mc_macaco_bot.py > mc_macaco.log 2>&1 &
 
 ```bash
 # Run directly
-python bots/link_downloader_bot.py
+python bots/link_downloader_bot. py
 
 # Run in background
 nohup python bots/link_downloader_bot.py > link_downloader.log 2>&1 &

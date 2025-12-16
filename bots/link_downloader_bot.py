@@ -1,3 +1,4 @@
+
 """
 Link Downloader Bot - Clean Code Version.
 Listens for video URLs in Telegram and downloads them.
@@ -14,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.integrations.telegram_service import TelegramService, TelegramFormatter
 from services.downloads.video_downloader_service import VideoDownloaderService
+from services.integrations.tiktok_service import TikTokUploader
+from services.ai.marketer import Marketer
 
 
 class LinkDownloaderBot:
@@ -33,6 +36,8 @@ class LinkDownloaderBot:
         """Initialize services."""
         self.telegram = TelegramService()
         self.downloader = VideoDownloaderService()
+        self.tiktok = TikTokUploader()
+        self.marketer = Marketer()
         
         print("🤖 LINK DOWNLOADER BOT")
         print("=" * 60)
@@ -97,6 +102,28 @@ class LinkDownloaderBot:
         
         if success:
             print(f"   ✅ Video sent successfully!")
+            self.telegram.send_message("🚀 Preparing to upload to TikTok...")
+            
+            # Generate marketing metadata
+            try:
+                metadata = self.marketer.generate(video_info.title)
+                
+                # Upload to TikTok
+                tiktok_success = self.tiktok.upload_video(
+                    file_path=str(video_info.filepath),
+                    title=metadata['title'],
+                    hashtags=metadata['hashtags']
+                )
+                
+                if tiktok_success:
+                    self.telegram.send_message("✅ Video uploaded to TikTok successfully!")
+                else:
+                    self.telegram.send_message("❌ Failed to upload video to TikTok.")
+                    
+            except Exception as e:
+                print(f"   ❌ Failed to generate metadata or upload to TikTok: {e}")
+                self.telegram.send_message("❌ Failed to generate metadata or upload to TikTok.")
+
         else:
             print(f"   ❌ Failed to send video")
             self.telegram.send_message(
