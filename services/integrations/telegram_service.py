@@ -5,8 +5,9 @@ Handles all Telegram Bot API interactions.
 
 from __future__ import annotations
 import os
+import asyncio
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Awaitable
 import requests
 
 
@@ -225,6 +226,60 @@ class TelegramService:
         except requests.exceptions.RequestException as e:
             print(f"❌ Connection failed: {e}")
             return False
+
+    async def listen_for_messages_async(
+        self,
+        callback: Callable[[str, int, str], None],
+        timeout: int = 30
+    ) -> None:
+        """
+        Async version of message polling for running alongside FastAPI.
+        
+        Args:
+            callback: Function called for each message (text, message_id, chat_id)
+            timeout: Long polling timeout in seconds
+        """
+        print("👂 [Async] Listening for Telegram messages...")
+        
+        offset = 0
+        
+        while True:
+            try:
+                # Run blocking request in executor to not block event loop
+                loop = asyncio.get_event_loop()
+                updates = await loop.run_in_executor(
+                    None, 
+                    lambda: self._get_updates(offset, timeout)
+                )
+                
+                for update in updates:
+                    offset = update['update_id'] + 1
+                    
+                    message = update.get('message')
+                    if not message:
+                        continue
+                    
+                    # Only process messages from configured chat
+                    if str(message['chat']['id']) != str(self._chat_id):
+                        continue
+                    
+                    text = message.get('text', '')
+                    message_id = message['message_id']
+                    chat_id = str(message['chat']['id'])
+                    
+                    if text:
+                        # Run callback in executor (it may do blocking I/O)
+                        await loop.run_in_executor(
+                            None,
+                            lambda t=text, m=message_id, c=chat_id: callback(t, m, c)
+                        )
+                        
+            except asyncio.CancelledError:
+                print("👋 [Async] Telegram listener stopped")
+                break
+            except Exception as e:
+                print(f"⚠️  Telegram polling error: {e}")
+                await asyncio.sleep(5)  # Wait before retry
 
 
 class TelegramFormatter:
