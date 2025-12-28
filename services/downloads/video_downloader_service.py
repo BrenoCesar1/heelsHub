@@ -4,6 +4,7 @@ Downloads videos from social media platforms using yt-dlp.
 """
 
 import time
+import subprocess
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -18,6 +19,7 @@ class VideoInfo:
     platform: str
     duration: int  # seconds
     size_mb: float
+    description: str = ""  # Original video description
 
 
 class VideoDownloaderService:
@@ -151,13 +153,18 @@ class VideoDownloaderService:
         options = {
             'format': 'best[ext=mp4]/best',
             'outtmpl': str(self.output_dir / '%(id)s.%(ext)s'),
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': False,  # Show output for debugging
+            'no_warnings': False,
             'noplaylist': True,
+            'socket_timeout': 30,  # Add timeout
+            'retries': 3,
         }
+        
+        print(f"   🔧 Starting yt-dlp download...")
         
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
+            print(f"   ✅ yt-dlp extraction complete")
             
             if not info:
                 raise ValueError("Failed to extract video information")
@@ -165,6 +172,7 @@ class VideoDownloaderService:
             # Extract metadata
             video_id = info.get('id', 'unknown')
             title = info.get('title', 'Untitled')
+            description = info.get('description', '') or ''  # Original description
             duration = info.get('duration', 0)
             ext = info.get('ext', 'mp4')
             
@@ -182,14 +190,78 @@ class VideoDownloaderService:
             print(f"   📁 File: {filepath.name}")
             print(f"   📏 Size: {size_mb:.2f} MB")
             print(f"   ⏱️  Duration: {duration}s")
+            if description:
+                print(f"   📝 Description: {description[:100]}...")
+            
+            # Remove metadata from video
+            print(f"   🧹 Removing metadata...")
+            cleaned_filepath = self._remove_metadata(filepath)
             
             return VideoInfo(
-                filepath=filepath,
+                filepath=cleaned_filepath,
                 title=title,
                 platform=platform,
                 duration=int(duration),
-                size_mb=size_mb
+                size_mb=size_mb,
+                description=description
             )
+    
+    def _remove_metadata(self, input_path: Path) -> Path:
+        """
+        Remove all metadata from video file using ffmpeg.
+        
+        Args:
+            input_path: Path to video file with metadata
+            
+        Returns:
+            Path to cleaned video file
+            
+        Raises:
+            RuntimeError: If ffmpeg fails
+        """
+        output_path = input_path.with_stem(f"{input_path.stem}_clean")
+        
+        try:
+            # Run ffmpeg to strip metadata
+            # -map_metadata -1: Remove all metadata
+            # -c:v copy: Copy video codec without re-encoding (fast)
+            # -c:a copy: Copy audio codec without re-encoding (fast)
+            # -fflags +bitexact: Remove encoder information
+            # -loglevel error: Only show errors
+            cmd = [
+                'ffmpeg',
+                '-i', str(input_path),
+                '-map_metadata', '-1',
+                '-c:v', 'copy',
+                '-c:a', 'copy',
+                '-fflags', '+bitexact',
+                '-loglevel', 'error',
+                '-y',  # Overwrite output file
+                str(output_path)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                raise RuntimeError(f"ffmpeg failed: {result.stderr}")
+            
+            # Remove original file and rename cleaned file
+            input_path.unlink()
+            output_path.rename(input_path)
+            
+            print(f"   ✅ Metadata removed successfully")
+            return input_path
+            
+        except subprocess.TimeoutExpired:
+            if output_path.exists():
+                output_path.unlink()
+            raise RuntimeError("ffmpeg timeout (30s)")
+        except FileNotFoundError:
+            raise RuntimeError("ffmpeg not found. Install with: sudo apt install ffmpeg")
+        except Exception as e:
+            if output_path.exists():
+                output_path.unlink()
+            raise RuntimeError(f"Failed to remove metadata: {e}")
     
     def cleanup_old_files(self, max_age_hours: int = 24) -> int:
         """

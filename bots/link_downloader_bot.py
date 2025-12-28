@@ -15,8 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.integrations.telegram_service import TelegramService, TelegramFormatter
 from services.downloads.video_downloader_service import VideoDownloaderService
-from services.integrations.tiktok_service import TikTokUploader
-from services.ai.marketer import Marketer
+from services.integrations.tiktok_api_service import TikTokAPIService
 
 
 class LinkDownloaderBot:
@@ -36,12 +35,26 @@ class LinkDownloaderBot:
         """Initialize services."""
         self.telegram = TelegramService()
         self.downloader = VideoDownloaderService()
-        self.tiktok = TikTokUploader()
-        self.marketer = Marketer()
+        
+        # TikTok auto-upload using official API
+        self.auto_upload = os.getenv('TIKTOK_AUTO_UPLOAD', 'false').lower() == 'true'
+        self.tiktok_api = None
+        
+        if self.auto_upload:
+            try:
+                self.tiktok_api = TikTokAPIService()
+                upload_method = "TikTok API (Official)"
+            except Exception as e:
+                print(f"⚠️  TikTok API init failed: {e}")
+                self.auto_upload = False
+                upload_method = "Disabled"
+        else:
+            upload_method = "Disabled"
         
         print("🤖 LINK DOWNLOADER BOT")
         print("=" * 60)
         print("Supports: Instagram, TikTok, Facebook, YouTube, Twitter")
+        print(f"TikTok Auto-Upload: {'✅' if self.auto_upload else '❌'} {upload_method}")
         print("=" * 60)
     
     def handle_message(self, message_text: str, message_id: int, chat_id: str) -> None:
@@ -102,27 +115,66 @@ class LinkDownloaderBot:
         
         if success:
             print(f"   ✅ Video sent successfully!")
-            self.telegram.send_message("🚀 Preparing to upload to TikTok...")
             
-            # Generate marketing metadata
-            try:
-                metadata = self.marketer.generate(video_info.title)
+            # TikTok auto-upload (if enabled)
+            if self.auto_upload and self.tiktok_api:
+                self.telegram.send_message("🚀 Uploading to TikTok...")
                 
-                # Upload to TikTok
-                tiktok_success = self.tiktok.upload_video(
-                    file_path=str(video_info.filepath),
-                    title=metadata['title'],
-                    hashtags=metadata['hashtags']
-                )
-                
-                if tiktok_success:
-                    self.telegram.send_message("✅ Video uploaded to TikTok successfully!")
-                else:
-                    self.telegram.send_message("❌ Failed to upload video to TikTok.")
+                try:
+                    # Use ORIGINAL description from video (no AI)
+                    description = video_info.description or video_info.title
                     
-            except Exception as e:
-                print(f"   ❌ Failed to generate metadata or upload to TikTok: {e}")
-                self.telegram.send_message("❌ Failed to generate metadata or upload to TikTok.")
+                    # Limit to 150 chars (TikTok limit)
+                    if len(description) > 150:
+                        description = description[:147] + "..."
+                    
+                    print(f"   📝 Using original description:")
+                    print(f"      {description[:100]}...")
+                    print(f"   📤 Uploading to TikTok via Official API...")
+                    
+                    publish_id = self.tiktok_api.upload_video(
+                        video_path=video_info.filepath,
+                        title=description,
+                        privacy_level="SELF_ONLY"  # Upload as private for review
+                    )
+                    
+                    if publish_id:
+                        print(f"   ✅ TikTok API upload successful!")
+                        self.telegram.send_message(
+                            f"✅ Video uploaded to TikTok!\n\n"
+                            f"📝 Description:\n{description}\n\n"
+                            f"🔒 Uploaded as PRIVATE\n"
+                            f"📱 Check TikTok app to publish\n\n"
+                            f"🆔 Publish ID: {publish_id}"
+                        )
+                    else:
+                        print(f"   ❌ TikTok upload failed")
+                        self.telegram.send_message(
+                            "❌ TikTok upload failed\n"
+                            "💡 Video saved in temp_videos/ for manual upload"
+                        )
+                        
+                except Exception as e:
+                    import traceback
+                    print(f"   ❌ TikTok error:")
+                    print(traceback.format_exc())
+                    self.telegram.send_message(
+                        f"❌ TikTok error: {str(e)}\n"
+                        "💡 Set TIKTOK_AUTO_UPLOAD=false to disable"
+                    )
+            else:
+                print(f"   ℹ️  TikTok auto-upload disabled")
+                
+                # Show description for manual upload
+                description = video_info.description or video_info.title
+                if len(description) > 150:
+                    description = description[:147] + "..."
+                
+                self.telegram.send_message(
+                    f"✅ Vídeo baixado com sucesso!\n\n"
+                    f"📝 Descrição original:\n{description}\n\n"
+                    f"💡 Copie a descrição e poste manualmente no TikTok!"
+                )
 
         else:
             print(f"   ❌ Failed to send video")

@@ -1,5 +1,5 @@
 """
-MC Macaco Bot - Automated Video Generation Bot.
+AI Content Creator Bot - Automated Video Generation Bot.
 
 Workflow:
 1. Generate creative script using AI
@@ -28,7 +28,7 @@ from services.integrations.telegram_service import TelegramService, TelegramForm
 from services.video_generation.video_generator import VideoGenerator
 
 
-class MCMacacoBot:
+class ContentCreatorBot:
     """Main bot orchestrator handling the complete video generation pipeline."""
     
     def __init__(self):
@@ -46,7 +46,7 @@ class MCMacacoBot:
             Path object for the video file
         """
         timestamp = int(time.time())
-        filename = f"mc_macaco_{timestamp}.mp4"
+        filename = f"ai_content_{timestamp}.mp4"
         return config.TEMP_VIDEOS_DIR / filename
     
     def run_cycle(self) -> bool:
@@ -57,7 +57,7 @@ class MCMacacoBot:
             True if successful, False otherwise
         """
         print("\n" + "="*60)
-        print("🦍 MC MACACO BOT - Starting Generation Cycle")
+        print("🤖 AI CONTENT CREATOR - Starting Generation Cycle")
         print("="*60)
         
         video_path: Path | None = None
@@ -72,7 +72,7 @@ class MCMacacoBot:
             print("\n📊 [2/4] Creating viral marketing metadata...")
             marketing = self.marketer.generate(script.get("raw_script", ""))
             
-            title = marketing.get("title", "MC Macaco na Selva")
+            title = marketing.get("title", "AI Generated Video")
             hashtags = marketing.get("hashtags", [])
             print(f"   ✓ Title: {title}")
             print(f"   ✓ Hashtags: {' '.join(hashtags)}")
@@ -161,12 +161,12 @@ def run_scheduler() -> NoReturn:
 
 
 def main() -> None:
-    """Main entry point for MC Macaco Bot."""
+    """Main entry point for AI Content Creator Bot."""
     # Load environment variables
     load_dotenv()
     
     print("="*60)
-    print("🤖 MC MACACO BOT - System Initialized")
+    print("🤖 AI CONTENT CREATOR - System Initialized")
     print("="*60)
     print(f"Debug Mode: {'ON' if config.DEBUG_MODE else 'OFF'}")
     print(f"Schedule: {', '.join(config.SCHEDULE_TIMES)}")
@@ -174,7 +174,7 @@ def main() -> None:
     print("="*60)
     
     # Initialize bot
-    bot = MCMacacoBot()
+    bot = ContentCreatorBot()
     
     # Run immediately if configured
     if config.RUN_IMMEDIATELY:

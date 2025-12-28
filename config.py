@@ -1,4 +1,4 @@
-"""Configuration settings for MC Macaco Bot."""
+"""Configuration settings for AI Content Creator Bot."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,3 +39,18 @@ class BotConfig:
 
 # Global configuration instance
 config = BotConfig()
+
+# Backwards-compatible module-level settings
+from os import getenv
+
+# Expose common settings as module-level variables for older imports
+TEMP_VIDEOS_DIR = config.TEMP_VIDEOS_DIR
+GEMINI_MODEL = config.GEMINI_MODEL
+VEO_MODEL = config.VEO_MODEL
+
+# Toggle automatic TikTok uploads (can be set via environment)
+TIKTOK_AUTO_UPLOAD = getenv('TIKTOK_AUTO_UPLOAD', 'true').lower() in ('1', 'true', 'yes')
+
+# Optional TikTok credentials from environment (if provided)
+TIKTOK_CLIENT_KEY = getenv('TIKTOK_CLIENT_KEY')
+TIKTOK_CLIENT_SECRET = getenv('TIKTOK_CLIENT_SECRET')

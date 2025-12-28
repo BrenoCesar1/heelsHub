@@ -249,7 +249,7 @@ class TelegramFormatter:
         """
         hashtags_str = ' '.join(hashtags)
         
-        caption = f"""🎬 <b>MC Macaco Bot - Vídeo Gerado!</b>
+        caption = f"""🎬 <b>AI Content Creator - Vídeo Gerado!</b>
 
 📝 <b>Título:</b>
 {title}

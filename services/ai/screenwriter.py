@@ -1,7 +1,7 @@
 """
 Script generation agent using Gemini AI.
 
-This agent creates creative video scripts for MC Macaco, generating:
+This agent creates creative video scripts for AI-generated content, generating:
 - Visual prompts (in English for Veo AI)
 - Audio prompts (in Portuguese with São Paulo slang)
 - Raw script summaries
@@ -44,25 +44,25 @@ class Script:
 
 class Screenwriter:
     """
-    AI-powered script generator for MC Macaco comedy videos.
+    AI-powered script generator for comedy videos.
     
-    Uses Gemini AI to create engaging, humorous scripts featuring MC Macaco
-    in everyday situations with a comedic twist.
+    Uses Gemini AI to create engaging, humorous scripts for AI-generated
+    content in everyday situations with a comedic twist.
     """
     
     # Character and universe definition
     SYSTEM_PROMPT = (
         "You are a prompt engineering expert for Google Veo 3.1 video generation. "
-        "Create technical, structured prompts for 'MC Macaco' videos.\n\n"
+        "Create technical, structured prompts for AI-generated comedy videos.\n\n"
         "### UNIVERSE & CHARACTERS\n"
-        "* **MC MACACO (Protagonist):** Capuchin monkey, charismatic 'maloqueiro' (street-smart). "
+        "* **Character (Protagonist):** Capuchin monkey, charismatic 'maloqueiro' (street-smart). "
         "Wears black Ray-Ban sunglasses. Acts like a São Paulo periphery digital influencer.\n"
         "* **Setting:** Amazon rainforest treated as São Paulo 'quebrada' (neighborhood).\n\n"
         "### CRITICAL RULES\n"
         "1. **Language:** Technical prompts in ENGLISH. Dialogue in PORTUGUESE with São Paulo slang.\n"
         "2. **Safety:** NEVER describe weapons, drugs, or explicit violence.\n"
         "3. **Format:** VERTICAL 9:16 (smartphone portrait) for TikTok/Reels.\n"
-        "4. MC Macaco does NOT sing/rap. He SPEAKS in comedic everyday situations."
+        "4. Character does NOT sing/rap. He SPEAKS in comedic everyday situations."
     )
     
     # Example situations for variation (USE AS INSPIRATION ONLY - create original variations)
@@ -122,6 +122,50 @@ class Screenwriter:
         
         raise RuntimeError(f"Script generation failed after {self.MAX_RETRIES} attempts")
     
+    def generate_script(self) -> Script:
+        """
+        Generate a complete video script (returns Script object).
+        
+        Returns:
+            Script object with visual_prompt, audio_prompt, and raw_script
+            
+        Raises:
+            RuntimeError: If all retries fail
+        """
+        script_dict = self.generate()
+        return Script.from_dict(script_dict)
+    
+    def enhance_user_idea(self, user_idea: str) -> Script:
+        """
+        Enhance user's video idea with AI and generate a complete script.
+        
+        Takes a user's simple idea and transforms it into a full production-ready
+        script with detailed visual and audio prompts.
+        
+        Args:
+            user_idea: User's video concept/idea
+            
+        Returns:
+            Script object with enhanced prompts
+            
+        Raises:
+            RuntimeError: If generation fails
+        """
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                prompt = self._build_idea_enhancement_prompt(user_idea)
+                response = self._call_gemini_api(prompt)
+                script_data = self._parse_response(response)
+                self._validate_script(script_data)
+                return Script.from_dict(script_data)
+            except Exception as e:
+                if self._is_rate_limit_error(e) and attempt < self.MAX_RETRIES - 1:
+                    self._handle_retry(attempt)
+                else:
+                    raise
+        
+        raise RuntimeError(f"Idea enhancement failed after {self.MAX_RETRIES} attempts")
+    
     def _generate_script(self) -> dict[str, str]:
         """Generate script by calling Gemini AI API."""
         prompt = self._build_prompt()
@@ -136,7 +180,7 @@ class Screenwriter:
         situations = "\n".join(f"- {s}" for s in self.SITUATION_EXAMPLES)
         
         return (
-            "Create a viral 8-second MC Macaco script.\n\n"
+            "Create a viral 8-second comedy script.\n\n"
             f"USE THESE AS INSPIRATION (create something ORIGINAL with similar style):\n{situations}\n\n"
             "⚠️ DO NOT copy examples - invent new funny situations keeping the same comedy style!\n\n"
             "RETURN ONLY THIS JSON (no markdown, single object):\n"
@@ -145,15 +189,39 @@ class Screenwriter:
             'Vertical 9:16 format. POV handheld selfie style. Close-up of capuchin monkey wearing black Ray-Ban sunglasses...",\n'
             '  "audio_prompt": "IN PORTUGUESE - Complete dialogue with São Paulo slang: '
             'Chama no grau família! Pega o ronco da XJ6! RANDANDANDAN!...",\n'
-            '  "raw_script": "IN PORTUGUESE - Summary: MC Macaco rides armadillo like motorcycle..."\n'
+            '  "raw_script": "IN PORTUGUESE - Summary: Monkey rides armadillo like motorcycle..."\n'
             "}\n\n"
             "MANDATORY RULES:\n"
             "- visual_prompt: ENGLISH, very detailed, VERTICAL 9:16, camera style (POV/selfie/handheld)\n"
             "- audio_prompt: PORTUGUESE, complete dialogue with heavy São Paulo accent, urban slang\n"
-            "- MC Macaco acts as street influencer, does NOT sing/rap\n"
+            "- Character acts as street influencer, does NOT sing/rap\n"
             "- Use real Amazon animals (capybara, armadillo, jaguar, macaw) in urban situations\n"
             "- Combined visual + verbal humor\n"
             "- Return 1 JSON object only, not a list"
+        )
+    
+    def _build_idea_enhancement_prompt(self, user_idea: str) -> str:
+        """Build prompt for enhancing user's idea into a full script."""
+        return (
+            f"Transform this user idea into a viral 8-second comedy video script:\n\n"
+            f"USER IDEA: {user_idea}\n\n"
+            "Enhance and develop this idea following these guidelines:\n"
+            "- Keep the core concept but make it more dynamic and visually interesting\n"
+            "- Add specific camera angles and movements for vertical 9:16 format\n"
+            "- Create engaging Portuguese dialogue with São Paulo slang\n"
+            "- Make it funny and shareable\n\n"
+            "RETURN ONLY THIS JSON (no markdown):\n"
+            "{\n"
+            '  "visual_prompt": "IN ENGLISH - Detailed cinematographic description: '
+            'Vertical 9:16, camera style, lighting, actions...",\n'
+            '  "audio_prompt": "IN PORTUGUESE - Complete dialogue with slang...",\n'
+            '  "raw_script": "IN PORTUGUESE - Brief summary of the scene..."\n'
+            "}\n\n"
+            "MANDATORY RULES:\n"
+            "- visual_prompt: ENGLISH, very detailed, VERTICAL 9:16 format\n"
+            "- audio_prompt: PORTUGUESE with São Paulo slang\n"
+            "- 8 seconds maximum duration\n"
+            "- Return 1 JSON object only"
         )
     
     def _call_gemini_api(self, prompt: str) -> dict[str, Any]:
