@@ -20,9 +20,25 @@ router = APIRouter(prefix="/api/videos", tags=["Videos"])
 # In-memory task storage (consider Redis for production)
 _tasks: Dict[str, VideoTaskStatus] = {}
 
-# Service instances
-_video_service = VideoGenerationService()
-_ideas_storage = IdeasStorage()
+# Service instances (lazy initialization to avoid errors when env vars are missing)
+_video_service: VideoGenerationService = None
+_ideas_storage: IdeasStorage = None
+
+
+def _get_video_service() -> VideoGenerationService:
+    """Get or create video service instance (lazy initialization)."""
+    global _video_service
+    if _video_service is None:
+        _video_service = VideoGenerationService()
+    return _video_service
+
+
+def _get_ideas_storage() -> IdeasStorage:
+    """Get or create ideas storage instance (lazy initialization)."""
+    global _ideas_storage
+    if _ideas_storage is None:
+        _ideas_storage = IdeasStorage()
+    return _ideas_storage
 
 
 async def _generate_video_task(
@@ -43,7 +59,7 @@ async def _generate_video_task(
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None,
-            _video_service.generate_video,
+            _get_video_service().generate_video,
             user_idea,
             send_to_telegram,
             post_to_tiktok,
@@ -58,7 +74,7 @@ async def _generate_video_task(
         
         # Increment idea counter if using saved idea
         if idea_id:
-            _ideas_storage.increment_video_count(idea_id)
+            _get_ideas_storage().increment_video_count(idea_id)
             
     except Exception as e:
         _tasks[task_id].status = VideoStatus.FAILED
@@ -94,7 +110,7 @@ async def generate_video(
     # Get idea from storage if idea_id is provided
     user_idea = request.user_idea
     if request.idea_id:
-        idea = _ideas_storage.get(request.idea_id)
+        idea = _get_ideas_storage().get(request.idea_id)
         if not idea:
             raise HTTPException(
                 status_code=404,

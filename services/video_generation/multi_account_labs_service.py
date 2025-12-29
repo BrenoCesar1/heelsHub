@@ -44,9 +44,11 @@ class MultiAccountLabsService:
         self.current_account_index = 0
         
         if not self.accounts:
-            raise ValueError("Nenhuma conta Labs configurada. Configure LABS_API_KEY_1 no .env")
-        
-        print(f"🔧 MultiAccountLabsService inicializado com {len(self.accounts)} contas")
+            # Don't raise error on init - will raise when trying to generate video
+            print("⚠️  MultiAccountLabsService: Nenhuma conta Labs configurada")
+            print("   Configure LABS_API_KEY_1 no .env para usar geração de vídeo")
+        else:
+            print(f"🔧 MultiAccountLabsService inicializado com {len(self.accounts)} contas")
     
     def _load_accounts_from_env(self) -> List[LabsAccount]:
         """Carrega contas Labs do arquivo .env."""
@@ -116,8 +118,15 @@ class MultiAccountLabsService:
             output_path: Caminho de saída
             
         Returns:
-            Caminho do vídeo ou None se falhar
+            Path do vídeo gerado ou None se falhar
         """
+        # Validate that accounts are configured
+        if not self.accounts:
+            raise ValueError(
+                "Nenhuma conta Labs configurada. "
+                "Configure LABS_API_KEY_1 no .env para usar geração de vídeo"
+            )
+        
         account = self._get_current_account()
         
         # Verifica se tem créditos suficientes
