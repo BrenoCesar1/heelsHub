@@ -28,14 +28,9 @@ def main():
     processes = []
     
     try:
-        # Start Link Downloader Bot
-        print("\n📱 Starting Link Downloader Bot...")
-        bot_process = subprocess.Popen(
-            [sys.executable, "bots/link_downloader_bot.py"],
-            cwd=project_root
-        )
-        processes.append(("Link Downloader Bot", bot_process))
-        print("✅ Link Downloader Bot started")
+        # NOTE: Link Downloader Bot is now embedded in FastAPI
+        # No need to start it separately - it runs as an async task inside the API
+        # This prevents duplicate message processing
         
         # Start FastAPI server
         print("\n🌐 Starting FastAPI server...")
@@ -57,7 +52,7 @@ def main():
         print("="*60)
         print("\n📚 API Documentation: http://localhost:8070/docs")
         print("🔍 Health Check: http://localhost:8070/health")
-        print("📱 Telegram Bot: Listening for video links")
+        print("📱 Telegram Bot: Embedded in API (async)")
         print("\n💡 Press Ctrl+C to stop all services\n")
         
         # Wait for processes
