@@ -293,33 +293,33 @@ class VideoDownloaderService:
         
         # Locate downloaded file
         filepath = self.output_dir / f"{video_id}.{ext}"
-            
-            if not filepath.exists():
-                raise FileNotFoundError("Downloaded file not found")
-            
-            # Calculate file size
-            size_bytes = filepath.stat().st_size
-            size_mb = size_bytes / (1024 * 1024)
-            
-            print(f"   ✅ Download complete!")
-            print(f"   📁 File: {filepath.name}")
-            print(f"   📏 Size: {size_mb:.2f} MB")
-            print(f"   ⏱️  Duration: {duration}s")
-            if description:
-                print(f"   📝 Description: {description[:100]}...")
-            
-            # Remove metadata from video
-            print(f"   🧹 Removing metadata...")
-            cleaned_filepath = self._remove_metadata(filepath)
-            
-            return VideoInfo(
-                filepath=cleaned_filepath,
-                title=title,
-                platform=platform,
-                duration=int(duration),
-                size_mb=size_mb,
-                description=description
-            )
+        
+        if not filepath.exists():
+            raise FileNotFoundError("Downloaded file not found")
+        
+        # Calculate file size
+        size_bytes = filepath.stat().st_size
+        size_mb = size_bytes / (1024 * 1024)
+        
+        print(f"   ✅ Download complete!")
+        print(f"   📁 File: {filepath.name}")
+        print(f"   📏 Size: {size_mb:.2f} MB")
+        print(f"   ⏱️  Duration: {duration}s")
+        if description:
+            print(f"   📝 Description: {description[:100]}...")
+        
+        # Remove metadata from video
+        print(f"   🧹 Removing metadata...")
+        cleaned_filepath = self._remove_metadata(filepath)
+        
+        return VideoInfo(
+            filepath=cleaned_filepath,
+            title=title,
+            platform=platform,
+            duration=int(duration),
+            size_mb=size_mb,
+            description=description
+        )
     
     def _remove_metadata(self, input_path: Path) -> Path:
         """
