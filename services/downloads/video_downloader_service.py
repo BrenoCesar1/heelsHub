@@ -280,19 +280,19 @@ class VideoDownloaderService:
                 print("   " + "="*60)
 
             raise
-            
-            if not info:
-                raise ValueError("Failed to extract video information")
-            
-            # Extract metadata
-            video_id = info.get('id', 'unknown')
-            title = info.get('title', 'Untitled')
-            description = info.get('description', '') or ''  # Original description
-            duration = info.get('duration', 0)
-            ext = info.get('ext', 'mp4')
-            
-            # Locate downloaded file
-            filepath = self.output_dir / f"{video_id}.{ext}"
+        
+        if not info:
+            raise ValueError("Failed to extract video information")
+        
+        # Extract metadata
+        video_id = info.get('id', 'unknown')
+        title = info.get('title', 'Untitled')
+        description = info.get('description', '') or ''  # Original description
+        duration = info.get('duration', 0)
+        ext = info.get('ext', 'mp4')
+        
+        # Locate downloaded file
+        filepath = self.output_dir / f"{video_id}.{ext}"
             
             if not filepath.exists():
                 raise FileNotFoundError("Downloaded file not found")
