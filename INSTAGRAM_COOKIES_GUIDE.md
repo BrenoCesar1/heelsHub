@@ -37,18 +37,25 @@ O Instagram detecta requisições automatizadas (bots) e bloqueia com mensagens 
 # Copie cookies.txt para a pasta do projeto
 cp ~/Downloads/cookies.txt /home/breno/Post\ Tiktok/temp_videos/
 
-# Configure variável de ambiente
+# Opção A: Configure variável de ambiente (arquivo)
 export YTDLP_COOKIES_FILE=/home/breno/Post\ Tiktok/temp_videos/cookies.txt
 
-# Ou adicione ao .env
+# Opção B: Ou adicione ao .env
 echo "YTDLP_COOKIES_FILE=temp_videos/cookies.txt" >> .env
+
+# Opção C: Ou cole o conteúdo (simula Render)
+export YTDLP_COOKIES_CONTENT="$(cat temp_videos/cookies.txt)"
 ```
 
 **Render (produção):**
 ```bash
-# 1. Faça upload do cookies.txt para o Render
-# 2. Configure no Dashboard > Environment:
-YTDLP_COOKIES_FILE=/opt/render/project/src/temp_videos/cookies.txt
+# MÉTODO RECOMENDADO: Cole o conteúdo dos cookies
+# 1. Abra cookies.txt, copie TODO conteúdo
+# 2. Render Dashboard > Environment > Add Variable:
+#    Key: YTDLP_COOKIES_CONTENT
+#    Value: [cole o conteúdo completo aqui]
+# 3. Remova YTDLP_COOKIES_FILE se existir
+# 4. Manual Deploy
 ```
 
 ---
@@ -109,30 +116,52 @@ python run_api.py
 
 ### Para Render (Produção)
 
-#### Opção 1: Upload via Dashboard (Recomendado)
+#### Opção 1: Colar Cookies como Variável de Ambiente (✅ RECOMENDADO)
+
+**Use este método se não encontrar "Files" no painel do Render:**
 
 1. **Exporte cookies.txt** do navegador (passos acima)
 
-2. **Acesse Render Dashboard:**
+2. **Abra o arquivo cookies.txt** no seu computador e copie TODO o conteúdo
+
+3. **Acesse Render Dashboard:**
    - Vá para seu serviço
-   - **Settings** > **Files**
-   - **Add Secret File**
+   - Clique em **Environment** no menu lateral
+   - Clique em **Add Environment Variable**
 
-3. **Configure o arquivo:**
+4. **Cole o conteúdo dos cookies:**
    ```
-   Filename: temp_videos/cookies.txt
-   Content: [cole todo conteúdo do cookies.txt aqui]
+   Key: YTDLP_COOKIES_CONTENT
+   Value: [cole TODO o conteúdo do cookies.txt aqui - várias linhas]
    ```
+   
+   ⚠️ **Importante:** 
+   - Cole o conteúdo COMPLETO (não o caminho do arquivo)
+   - Incluindo a primeira linha `# Netscape HTTP Cookie File`
+   - Todas as linhas com domínios e cookies
 
-4. **Adicione variável de ambiente:**
-   - **Environment** tab
-   - **Add Environment Variable**
+5. **Remova YTDLP_COOKIES_FILE se existir:**
+   - Se houver uma variável `YTDLP_COOKIES_FILE` → Delete
+   - (Essa variável não funciona sem arquivo físico)
+
+6. **Salve e faça Manual Deploy**
+
+#### Opção 2: Upload via "Secret Files" (se disponível)
+
+Se sua conta Render tiver acesso a "Secret Files":
+
+1. **Settings** > **Secret Files**
+2. **Add Secret File**
+   - Filename: `temp_videos/cookies.txt`
+   - Content: [cole todo conteúdo do cookies.txt]
+
+3. **Environment** > Add Variable:
    ```
    Key: YTDLP_COOKIES_FILE
    Value: /opt/render/project/src/temp_videos/cookies.txt
    ```
 
-5. **Redeploy** o serviço
+4. **Redeploy** o serviço
 
 #### Opção 2: Via Git (NÃO recomendado para cookies)
 

@@ -176,17 +176,39 @@ class VideoDownloaderService:
 
         # Optional credentials/cookies support via environment variables
         # For Instagram: cookies are HIGHLY RECOMMENDED to avoid rate limits
-        # Support two ways to provide cookies in production environments where
-        # uploading files isn't available:
-        # 1) path via YTDLP_COOKIES_FILE
-        # 2) paste entire cookies.txt into YTDLP_COOKIES_CONTENT (safer for Render env)
+        # Support multiple ways to provide cookies:
+        # 1) YTDLP_COOKIES_FILE - path to existing file
+        # 2) YTDLP_COOKIES_CONTENT - full cookies.txt content (may be too large for Render)
+        # 3) INSTAGRAM_SESSIONID + INSTAGRAM_CSRFTOKEN + INSTAGRAM_DS_USER_ID (minimal, recommended for Render)
         cookies_file = os.getenv('YTDLP_COOKIES_FILE')
         cookies_content = os.getenv('YTDLP_COOKIES_CONTENT')
         username = os.getenv('YTDLP_USERNAME')
         password = os.getenv('YTDLP_PASSWORD')
+        
+        # Instagram minimal cookies (for Render where full cookies.txt is too large)
+        ig_sessionid = os.getenv('INSTAGRAM_SESSIONID')
+        ig_csrftoken = os.getenv('INSTAGRAM_CSRFTOKEN')
+        ig_ds_user_id = os.getenv('INSTAGRAM_DS_USER_ID')
 
-        # If full cookies content is provided via env, write to a file and use it
-        if cookies_content:
+        # Priority 1: Individual Instagram cookies (most reliable for Render)
+        if ig_sessionid and 'instagram' in url.lower():
+            try:
+                cookies_path = self.output_dir / "cookies_instagram_minimal.txt"
+                with open(cookies_path, 'w') as f:
+                    f.write("# Netscape HTTP Cookie File\n")
+                    f.write("# Generated from INSTAGRAM_* env vars\n\n")
+                    # Essential Instagram cookies only
+                    f.write(f".instagram.com\tTRUE\t/\tTRUE\t1999999999\tsessionid\t{ig_sessionid}\n")
+                    if ig_csrftoken:
+                        f.write(f".instagram.com\tTRUE\t/\tTRUE\t1999999999\tcsrftoken\t{ig_csrftoken}\n")
+                    if ig_ds_user_id:
+                        f.write(f".instagram.com\tTRUE\t/\tTRUE\t1999999999\tds_user_id\t{ig_ds_user_id}\n")
+                options['cookiefile'] = str(cookies_path)
+                print(f"   🔐 Created minimal Instagram cookies from env vars")
+            except Exception as e:
+                print(f"   ⚠️  Failed to create minimal cookies: {e}")
+        # Priority 2: Full cookies content (may fail on Render if too large)
+        elif cookies_content:
             try:
                 cookies_path = self.output_dir / "cookies_from_env.txt"
                 cookies_path.write_text(cookies_content)
@@ -194,6 +216,7 @@ class VideoDownloaderService:
                 print(f"   🔐 Wrote cookies from YTDLP_COOKIES_CONTENT to: {cookies_path}")
             except Exception as e:
                 print(f"   ⚠️  Failed to write cookies from env: {e}")
+        # Priority 3: Path to existing file
         elif cookies_file:
             cookies_path = Path(cookies_file)
             if cookies_path.exists():
