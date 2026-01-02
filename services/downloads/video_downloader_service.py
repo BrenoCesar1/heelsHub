@@ -176,11 +176,25 @@ class VideoDownloaderService:
 
         # Optional credentials/cookies support via environment variables
         # For Instagram: cookies are HIGHLY RECOMMENDED to avoid rate limits
+        # Support two ways to provide cookies in production environments where
+        # uploading files isn't available:
+        # 1) path via YTDLP_COOKIES_FILE
+        # 2) paste entire cookies.txt into YTDLP_COOKIES_CONTENT (safer for Render env)
         cookies_file = os.getenv('YTDLP_COOKIES_FILE')
+        cookies_content = os.getenv('YTDLP_COOKIES_CONTENT')
         username = os.getenv('YTDLP_USERNAME')
         password = os.getenv('YTDLP_PASSWORD')
 
-        if cookies_file:
+        # If full cookies content is provided via env, write to a file and use it
+        if cookies_content:
+            try:
+                cookies_path = self.output_dir / "cookies_from_env.txt"
+                cookies_path.write_text(cookies_content)
+                options['cookiefile'] = str(cookies_path)
+                print(f"   🔐 Wrote cookies from YTDLP_COOKIES_CONTENT to: {cookies_path}")
+            except Exception as e:
+                print(f"   ⚠️  Failed to write cookies from env: {e}")
+        elif cookies_file:
             cookies_path = Path(cookies_file)
             if cookies_path.exists():
                 options['cookiefile'] = str(cookies_path)
