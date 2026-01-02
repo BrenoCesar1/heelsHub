@@ -28,6 +28,13 @@
 - ✅ **Remoção de metadados**: ffmpeg para stealth mode
 - ✅ **Extração de descrição**: Mantém contexto original
 - ✅ **Upload automático**: Direto para TikTok após download
+- ✅ **Suporte a cookies**: Bypass de rate-limits do Instagram
+- ✅ **Anti-detecção**: User-agent e headers customizados
+
+### ⚠️ Bloqueio do Instagram?
+Se downloads do Instagram falharem com erro de rate-limit/login:
+- 📚 **Veja guia completo**: [INSTAGRAM_COOKIES_GUIDE.md](INSTAGRAM_COOKIES_GUIDE.md)
+- 🍪 **Solução rápida**: Exporte cookies do navegador e configure `YTDLP_COOKIES_FILE`
 
 ---
 
@@ -123,7 +130,12 @@ TELEGRAM_CHAT_ID=your_chat_id
 TIKTOK_CLIENT_KEY=your_client_key
 TIKTOK_CLIENT_SECRET=your_client_secret
 TIKTOK_AUTO_UPLOAD=true
+
+# Video Downloader (opcional - para Instagram rate-limits)
+YTDLP_COOKIES_FILE=temp_videos/cookies.txt
 ```
+
+> **💡 Dica:** Se downloads do Instagram falharem, veja [INSTAGRAM_COOKIES_GUIDE.md](INSTAGRAM_COOKIES_GUIDE.md)
 
 ### Iniciar Sistema Completo
 

@@ -5,6 +5,7 @@ Downloads videos from social media platforms using yt-dlp.
 
 import time
 import subprocess
+import os
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -150,21 +151,93 @@ class VideoDownloaderService:
         """
         import yt_dlp
         
+        # Base options with anti-detection measures
         options = {
             'format': 'best[ext=mp4]/best',
             'outtmpl': str(self.output_dir / '%(id)s.%(ext)s'),
             'quiet': False,  # Show output for debugging
             'no_warnings': False,
             'noplaylist': True,
-            'socket_timeout': 30,  # Add timeout
+            'socket_timeout': 30,
             'retries': 3,
+            # Anti-bot detection headers
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'referer': url,  # Set referer to the URL itself
+            'nocheckcertificate': True,
         }
+
+        # Instagram-specific options (help with rate limits)
+        if 'instagram' in url.lower():
+            options['extractor_args'] = {
+                'instagram': {
+                    'api_type': 'graphql',  # Use GraphQL API (more stable)
+                }
+            }
+
+        # Optional credentials/cookies support via environment variables
+        # For Instagram: cookies are HIGHLY RECOMMENDED to avoid rate limits
+        cookies_file = os.getenv('YTDLP_COOKIES_FILE')
+        username = os.getenv('YTDLP_USERNAME')
+        password = os.getenv('YTDLP_PASSWORD')
+
+        if cookies_file:
+            cookies_path = Path(cookies_file)
+            if cookies_path.exists():
+                options['cookiefile'] = str(cookies_path)
+                print(f"   🔐 Using cookies file: {cookies_path}")
+            else:
+                print(f"   ⚠️  YTDLP_COOKIES_FILE set but file not found: {cookies_file}")
+        elif 'instagram' in url.lower():
+            print("   ⚠️  Instagram download without cookies - may fail due to rate limits")
+            print("   💡 Set YTDLP_COOKIES_FILE environment variable to use browser cookies")
+
+        if username and password:
+            options['username'] = username
+            options['password'] = password
+            print("   🔐 Using YTDLP_USERNAME / YTDLP_PASSWORD from environment")
         
         print(f"   🔧 Starting yt-dlp download...")
         
-        with yt_dlp.YoutubeDL(options) as ydl:
-            info = ydl.extract_info(url, download=True)
-            print(f"   ✅ yt-dlp extraction complete")
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(url, download=True)
+                print(f"   ✅ yt-dlp extraction complete")
+        except Exception as e:
+            # Provide clearer guidance for common yt-dlp failures (login, rate limits)
+            msg = str(e).lower()
+            error_str = str(e)
+            print(f"   ❌ yt-dlp error: {error_str}")
+
+            # Check for common failure patterns
+            needs_auth = any(keyword in msg for keyword in [
+                'login required', 
+                'requested content is not available',
+                'rate-limit',
+                'rate limit',
+                'login page',
+                'unable to extract',
+                'main webpage is locked'
+            ])
+
+            if needs_auth:
+                print("\n   ⚠️  DOWNLOAD BLOCKED - Authentication/Rate Limit Issue")
+                print("   " + "="*60)
+                
+                if 'instagram' in url.lower():
+                    print("   📱 INSTAGRAM SOLUTION:")
+                    print("   1. Export cookies from your browser (use 'Get cookies.txt LOCALLY' extension)")
+                    print("   2. Save as cookies.txt in project root or temp_videos/")
+                    print("   3. Set environment: YTDLP_COOKIES_FILE=/path/to/cookies.txt")
+                    print("\n   📚 Detailed Guide: See INSTAGRAM_COOKIES_GUIDE.md")
+                else:
+                    print("   🔐 AUTHENTICATION OPTIONS:")
+                    print("   • Export browser cookies: YTDLP_COOKIES_FILE=/path/to/cookies.txt")
+                    print("   • Use credentials: YTDLP_USERNAME and YTDLP_PASSWORD")
+                    print("\n   📖 More info: https://github.com/yt-dlp/yt-dlp#cookies")
+                
+                print("   " + "="*60)
+
+            raise
             
             if not info:
                 raise ValueError("Failed to extract video information")
