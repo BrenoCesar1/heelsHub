@@ -89,6 +89,18 @@ class EmbeddedLinkDownloaderBot:
         
         success = self.telegram.send_video(video_info.filepath, caption)
         
+        # Fallback: if video fails, try sending as document
+        if not success:
+            print(f"⚠️  Video send failed, trying as document...")
+            success = self.telegram.send_document(video_info.filepath, caption)
+            if not success:
+                self.telegram.send_message(
+                    f"❌ Failed to send video\n\n"
+                    f"📹 {video_info.title[:50]}\n"
+                    f"📏 {video_info.size_mb:.2f} MB\n"
+                    f"⏱️  {video_info.duration}s"
+                )
+        
         if success:
             description = video_info.description or video_info.title
             if len(description) > 150:

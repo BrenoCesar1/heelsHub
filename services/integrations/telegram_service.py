@@ -99,6 +99,49 @@ class TelegramService:
             
         except requests.exceptions.RequestException as e:
             print(f"❌ Failed to send video: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_detail = e.response.json()
+                    print(f"   Telegram API error: {error_detail}")
+                except:
+                    print(f"   Response text: {e.response.text[:200]}")
+            return False
+    
+    def send_document(self, file_path: Path, caption: str = "", parse_mode: str = "HTML") -> bool:
+        """
+        Send file as document to Telegram chat (fallback when video fails).
+        
+        Args:
+            file_path: Path to file
+            caption: File caption
+            parse_mode: Text formatting
+            
+        Returns:
+            True if sent successfully
+        """
+        url = f"{self.API_BASE_URL}{self._bot_token}/sendDocument"
+        
+        try:
+            with open(file_path, 'rb') as file:
+                files = {'document': file}
+                data = {
+                    'chat_id': self._chat_id,
+                    'caption': caption,
+                    'parse_mode': parse_mode
+                }
+                
+                response = requests.post(
+                    url,
+                    files=files,
+                    data=data,
+                    timeout=self.REQUEST_TIMEOUT
+                )
+            
+            response.raise_for_status()
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Failed to send document: {e}")
             return False
     
     def send_message(self, text: str, parse_mode: str = "HTML") -> bool:

@@ -164,6 +164,11 @@ class VideoDownloaderService:
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'referer': url,  # Set referer to the URL itself
             'nocheckcertificate': True,
+            # Ensure Telegram-compatible format (MP4 with H.264)
+            'postprocessors': [{
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': 'mp4',
+            }],
         }
 
         # Instagram-specific options (help with rate limits)
