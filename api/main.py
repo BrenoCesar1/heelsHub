@@ -54,7 +54,7 @@ class EmbeddedLinkDownloaderBot:
     
     def handle_message(self, message_text: str, message_id: int, chat_id: str) -> None:
         """Process incoming Telegram message."""
-        print(f"\n📩 [Bot] New message: {message_text[:50]}...")
+        print(f"\n📩 [Bot] New message from chat {chat_id}: {message_text[:50]}...")
         
         # Extract URL
         match = re.search(self.URL_PATTERN, message_text)
@@ -67,17 +67,21 @@ class EmbeddedLinkDownloaderBot:
             platform = self.downloader.get_platform(url) or "unknown"
             self.telegram.send_message(
                 f"❌ Unsupported platform: {platform}\n\n"
-                f"✅ Supported: Instagram, TikTok, Facebook, YouTube, Twitter"
+                f"✅ Supported: Instagram, TikTok, Facebook, YouTube, Twitter",
+                chat_id=chat_id
             )
             return
         
         platform = self.downloader.get_platform(url)
-        self.telegram.send_message(f"⬇️ Downloading from {platform}...\n⏳ Please wait...")
+        self.telegram.send_message(
+            f"⬇️ Downloading from {platform}...\n⏳ Please wait...",
+            chat_id=chat_id
+        )
         
         video_info = self.downloader.download(url)
         
         if not video_info:
-            self.telegram.send_message("❌ Download failed")
+            self.telegram.send_message("❌ Download failed", chat_id=chat_id)
             return
         
         caption = self.formatter.format_download_caption(
@@ -87,18 +91,19 @@ class EmbeddedLinkDownloaderBot:
             size_mb=video_info.size_mb
         )
         
-        success = self.telegram.send_video(video_info.filepath, caption)
+        success = self.telegram.send_video(video_info.filepath, caption, chat_id=chat_id, chat_id=chat_id)
         
         # Fallback: if video fails, try sending as document
         if not success:
             print(f"⚠️  Video send failed, trying as document...")
-            success = self.telegram.send_document(video_info.filepath, caption)
+            success = self.telegram.send_document(video_info.filepath, caption, chat_id=chat_id)
             if not success:
                 self.telegram.send_message(
                     f"❌ Failed to send video\n\n"
                     f"📹 {video_info.title[:50]}\n"
                     f"📏 {video_info.size_mb:.2f} MB\n"
-                    f"⏱️  {video_info.duration}s"
+                    f"⏱️  {video_info.duration}s",
+                    chat_id=chat_id
                 )
         
         if success:
@@ -107,7 +112,7 @@ class EmbeddedLinkDownloaderBot:
                 description = description[:147] + "..."
             
             if self.auto_upload and self.tiktok_api:
-                self.telegram.send_message("🚀 Uploading to TikTok...")
+                self.telegram.send_message("🚀 Uploading to TikTok...", chat_id=chat_id)
                 try:
                     publish_id = self.tiktok_api.upload_video(
                         video_path=video_info.filepath,
@@ -116,13 +121,15 @@ class EmbeddedLinkDownloaderBot:
                     )
                     if publish_id:
                         self.telegram.send_message(
-                            f"✅ Uploaded to TikTok!\n🔒 As PRIVATE\n🆔 ID: {publish_id}"
+                            f"✅ Uploaded to TikTok!\n🔒 As PRIVATE\n🆔 ID: {publish_id}",
+                            chat_id=chat_id
                         )
                 except Exception as e:
-                    self.telegram.send_message(f"❌ TikTok error: {e}")
+                    self.telegram.send_message(f"❌ TikTok error: {e}", chat_id=chat_id)
             else:
                 self.telegram.send_message(
-                    f"✅ Vídeo baixado!\n\n📝 Descrição:\n{description}"
+                    f"✅ Vídeo baixado!\n\n📝 Descrição:\n{description}",
+                    chat_id=chat_id
                 )
         
         # Cleanup
@@ -160,21 +167,33 @@ async def lifespan(app: FastAPI):
     if ENABLE_TELEGRAM_BOT:
         telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
         telegram_chat = os.getenv("TELEGRAM_CHAT_ID")
+        telegram_authorized = os.getenv("TELEGRAM_AUTHORIZED_CHAT_IDS")
         
-        if telegram_token and telegram_chat:
+        # Bot needs either TELEGRAM_CHAT_ID or TELEGRAM_AUTHORIZED_CHAT_IDS
+        if telegram_token and (telegram_chat or telegram_authorized):
             try:
                 bot = EmbeddedLinkDownloaderBot()
+                
+                # Show configured users
+                authorized_ids = bot.telegram.get_authorized_chat_ids()
+                print(f"🤖 Telegram Link Downloader Bot: ENABLED")
+                print(f"👥 Authorized users: {len(authorized_ids)}")
                 
                 async def run_telegram_bot():
                     await bot.telegram.listen_for_messages_async(bot.handle_message)
                 
                 bot_task = asyncio.create_task(run_telegram_bot())
                 tasks.append(bot_task)
-                print("🤖 Telegram Link Downloader Bot: ENABLED")
             except Exception as e:
                 print(f"⚠️  Telegram Bot failed to start: {e}")
+                import traceback
+                traceback.print_exc()
         else:
             print("ℹ️  Telegram Bot: DISABLED (no tokens configured)")
+            if not telegram_token:
+                print("   Missing: TELEGRAM_BOT_TOKEN")
+            if not telegram_chat and not telegram_authorized:
+                print("   Missing: TELEGRAM_CHAT_ID or TELEGRAM_AUTHORIZED_CHAT_IDS")
     else:
         print("ℹ️  Telegram Bot: DISABLED (ENABLE_TELEGRAM_BOT=false)")
     
