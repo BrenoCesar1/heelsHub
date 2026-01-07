@@ -91,7 +91,7 @@ class EmbeddedLinkDownloaderBot:
             size_mb=video_info.size_mb
         )
         
-        success = self.telegram.send_video(video_info.filepath, caption, chat_id=chat_id, chat_id=chat_id)
+        success = self.telegram.send_video(video_info.filepath, caption, chat_id=chat_id)
         
         # Fallback: if video fails, try sending as document
         if not success:
