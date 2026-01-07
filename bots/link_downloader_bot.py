@@ -66,7 +66,7 @@ class LinkDownloaderBot:
             message_id: Telegram message ID
             chat_id: Telegram chat ID
         """
-        print(f"\n📩 New message: {message_text[:50]}...")
+        print(f"\n📩 New message from chat {chat_id}: {message_text[:50]}...")
         
         # Extract URL from message
         url = self._extract_url(message_text)
@@ -79,14 +79,16 @@ class LinkDownloaderBot:
             platform = self.downloader.get_platform(url) or "unknown"
             self.telegram.send_message(
                 f"❌ Unsupported platform: {platform}\n\n"
-                f"✅ Supported: Instagram, TikTok, Facebook, YouTube, Twitter"
+                f"✅ Supported: Instagram, TikTok, Facebook, YouTube, Twitter",
+                chat_id=chat_id
             )
             return
         
         # Notify user that download is starting
         platform = self.downloader.get_platform(url)
         self.telegram.send_message(
-            f"⬇️ Downloading from {platform}...\n⏳ Please wait..."
+            f"⬇️ Downloading from {platform}...\n⏳ Please wait...",
+            chat_id=chat_id
         )
         
         # Download video
@@ -98,7 +100,8 @@ class LinkDownloaderBot:
                 f"Possible reasons:\n"
                 f"• Private or deleted video\n"
                 f"• Invalid link\n"
-                f"• Geographic restriction"
+                f"• Geographic restriction",
+                chat_id=chat_id
             )
             return
         
@@ -110,15 +113,15 @@ class LinkDownloaderBot:
             size_mb=video_info.size_mb
         )
         
-        print(f"\n📤 Sending video to Telegram...")
-        success = self.telegram.send_video(video_info.filepath, caption)
+        print(f"\n📤 Sending video to Telegram chat {chat_id}...")
+        success = self.telegram.send_video(video_info.filepath, caption, chat_id=chat_id)
         
         if success:
             print(f"   ✅ Video sent successfully!")
             
             # TikTok auto-upload (if enabled)
             if self.auto_upload and self.tiktok_api:
-                self.telegram.send_message("🚀 Uploading to TikTok...")
+                self.telegram.send_message("🚀 Uploading to TikTok...", chat_id=chat_id)
                 
                 try:
                     # Use ORIGINAL description from video (no AI)
@@ -145,13 +148,15 @@ class LinkDownloaderBot:
                             f"📝 Description:\n{description}\n\n"
                             f"🔒 Uploaded as PRIVATE\n"
                             f"📱 Check TikTok app to publish\n\n"
-                            f"🆔 Publish ID: {publish_id}"
+                            f"🆔 Publish ID: {publish_id}",
+                            chat_id=chat_id
                         )
                     else:
                         print(f"   ❌ TikTok upload failed")
                         self.telegram.send_message(
                             "❌ TikTok upload failed\n"
-                            "💡 Video saved in temp_videos/ for manual upload"
+                            "💡 Video saved in temp_videos/ for manual upload",
+                            chat_id=chat_id
                         )
                         
                 except Exception as e:
@@ -160,7 +165,8 @@ class LinkDownloaderBot:
                     print(traceback.format_exc())
                     self.telegram.send_message(
                         f"❌ TikTok error: {str(e)}\n"
-                        "💡 Set TIKTOK_AUTO_UPLOAD=false to disable"
+                        "💡 Set TIKTOK_AUTO_UPLOAD=false to disable",
+                        chat_id=chat_id
                     )
             else:
                 print(f"   ℹ️  TikTok auto-upload disabled")
@@ -173,7 +179,8 @@ class LinkDownloaderBot:
                 self.telegram.send_message(
                     f"✅ Vídeo baixado com sucesso!\n\n"
                     f"📝 Descrição original:\n{description}\n\n"
-                    f"💡 Copie a descrição e poste manualmente no TikTok!"
+                    f"💡 Copie a descrição e poste manualmente no TikTok!",
+                    chat_id=chat_id
                 )
 
         else:
@@ -181,7 +188,8 @@ class LinkDownloaderBot:
             self.telegram.send_message(
                 f"❌ Video downloaded but failed to send\n"
                 f"Size: {video_info.size_mb:.1f} MB\n\n"
-                f"(Telegram has 50 MB limit for videos)"
+                f"(Telegram has 50 MB limit for videos)",
+                chat_id=chat_id
             )
         
         # Cleanup downloaded file

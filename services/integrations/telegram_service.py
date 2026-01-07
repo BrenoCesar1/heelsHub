@@ -1,24 +1,30 @@
 """
 Telegram Service - Clean Code Version.
-Handles all Telegram Bot API interactions.
+Handles all Telegram Bot API interactions with multi-user support.
 """
 
 from __future__ import annotations
 import os
 import asyncio
 from pathlib import Path
-from typing import Optional, Callable, Awaitable
+from typing import Optional, Callable, Awaitable, Set
 import requests
 
 
 class TelegramService:
     """
-    Service for Telegram Bot API interactions.
+    Service for Telegram Bot API interactions with multi-user support.
     
     Responsibilities:
     - Send videos and messages
     - Listen for incoming messages
     - Validate bot configuration
+    - Manage authorized users
+    
+    Multi-user Support:
+    - Set TELEGRAM_AUTHORIZED_CHAT_IDS="id1,id2,id3" in .env for multiple users
+    - Each chat_id gets isolated message handling
+    - Backward compatible with single TELEGRAM_CHAT_ID
     """
     
     API_BASE_URL = "https://api.telegram.org/bot"
@@ -31,15 +37,62 @@ class TelegramService:
         
         Args:
             bot_token: Telegram bot token (defaults to env var)
-            chat_id: Target chat ID (defaults to env var)
+            chat_id: Target chat ID for sending (defaults to env var, optional for multi-user mode)
         """
         self._bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN")
         self._chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID")
         
         if not self._bot_token:
             raise ValueError("TELEGRAM_BOT_TOKEN not configured")
-        if not self._chat_id:
-            raise ValueError("TELEGRAM_CHAT_ID not configured")
+        
+        # Multi-user support: load authorized chat IDs
+        self._authorized_chat_ids = self._load_authorized_chat_ids()
+        
+        # For backward compatibility: if single chat_id is provided, add it to authorized list
+        if self._chat_id and self._chat_id not in self._authorized_chat_ids:
+            self._authorized_chat_ids.add(self._chat_id)
+        
+        # If no authorized IDs and no chat_id, we need at least one
+        if not self._authorized_chat_ids and not self._chat_id:
+            raise ValueError(
+                "No chat IDs configured. Set TELEGRAM_CHAT_ID or TELEGRAM_AUTHORIZED_CHAT_IDS"
+            )
+    
+    def _load_authorized_chat_ids(self) -> Set[str]:
+        """
+        Load authorized chat IDs from environment variable.
+        
+        Returns:
+            Set of authorized chat IDs
+        """
+        authorized_ids = os.getenv("TELEGRAM_AUTHORIZED_CHAT_IDS", "")
+        if not authorized_ids:
+            return set()
+        
+        # Parse comma-separated IDs and clean whitespace
+        ids = {chat_id.strip() for chat_id in authorized_ids.split(",") if chat_id.strip()}
+        return ids
+    
+    def is_authorized(self, chat_id: str) -> bool:
+        """
+        Check if a chat ID is authorized to use the bot.
+        
+        Args:
+            chat_id: Chat ID to check
+            
+        Returns:
+            True if authorized
+        """
+        return str(chat_id) in self._authorized_chat_ids
+    
+    def get_authorized_chat_ids(self) -> Set[str]:
+        """
+        Get all authorized chat IDs.
+        
+        Returns:
+            Set of authorized chat IDs
+        """
+        return self._authorized_chat_ids.copy()
     
     @property
     def is_configured(self) -> bool:
@@ -50,7 +103,8 @@ class TelegramService:
         self,
         video_path: str | Path,
         caption: str = "",
-        parse_mode: str = "HTML"
+        parse_mode: str = "HTML",
+        chat_id: Optional[str] = None
     ) -> bool:
         """
         Send video file to Telegram chat.
@@ -59,6 +113,7 @@ class TelegramService:
             video_path: Path to video file
             caption: Video caption (max 1024 chars)
             parse_mode: Caption formatting (HTML or Markdown)
+            chat_id: Specific chat ID to send to (defaults to configured chat_id)
             
         Returns:
             True if sent successfully
@@ -71,6 +126,11 @@ class TelegramService:
         if not video_path.exists():
             raise FileNotFoundError(f"Video not found: {video_path}")
         
+        # Use provided chat_id or default
+        target_chat_id = chat_id or self._chat_id
+        if not target_chat_id:
+            raise ValueError("No chat_id provided and no default configured")
+        
         url = f"{self.API_BASE_URL}{self._bot_token}/sendVideo"
         
         # Truncate caption if too long
@@ -81,7 +141,7 @@ class TelegramService:
             with open(video_path, 'rb') as video_file:
                 files = {'video': video_file}
                 data = {
-                    'chat_id': self._chat_id,
+                    'chat_id': target_chat_id,
                     'caption': caption,
                     'parse_mode': parse_mode,
                     'supports_streaming': True
@@ -107,7 +167,7 @@ class TelegramService:
                     print(f"   Response text: {e.response.text[:200]}")
             return False
     
-    def send_document(self, file_path: Path, caption: str = "", parse_mode: str = "HTML") -> bool:
+    def send_document(self, file_path: Path, caption: str = "", parse_mode: str = "HTML", chat_id: Optional[str] = None) -> bool:
         """
         Send file as document to Telegram chat (fallback when video fails).
         
@@ -115,17 +175,22 @@ class TelegramService:
             file_path: Path to file
             caption: File caption
             parse_mode: Text formatting
+            chat_id: Specific chat ID to send to (defaults to configured chat_id)
             
         Returns:
             True if sent successfully
         """
+        target_chat_id = chat_id or self._chat_id
+        if not target_chat_id:
+            raise ValueError("No chat_id provided and no default configured")
+        
         url = f"{self.API_BASE_URL}{self._bot_token}/sendDocument"
         
         try:
             with open(file_path, 'rb') as file:
                 files = {'document': file}
                 data = {
-                    'chat_id': self._chat_id,
+                    'chat_id': target_chat_id,
                     'caption': caption,
                     'parse_mode': parse_mode
                 }
@@ -144,22 +209,27 @@ class TelegramService:
             print(f"❌ Failed to send document: {e}")
             return False
     
-    def send_message(self, text: str, parse_mode: str = "HTML") -> bool:
+    def send_message(self, text: str, parse_mode: str = "HTML", chat_id: Optional[str] = None) -> bool:
         """
         Send text message to Telegram chat.
         
         Args:
             text: Message text
             parse_mode: Text formatting (HTML or Markdown)
+            chat_id: Specific chat ID to send to (defaults to configured chat_id)
             
         Returns:
             True if sent successfully
         """
+        target_chat_id = chat_id or self._chat_id
+        if not target_chat_id:
+            raise ValueError("No chat_id provided and no default configured")
+        
         url = f"{self.API_BASE_URL}{self._bot_token}/sendMessage"
         
         try:
             data = {
-                'chat_id': self._chat_id,
+                'chat_id': target_chat_id,
                 'text': text,
                 'parse_mode': parse_mode
             }
@@ -202,13 +272,21 @@ class TelegramService:
                     if not message:
                         continue
                     
-                    # Only process messages from configured chat
-                    if str(message['chat']['id']) != str(self._chat_id):
+                    chat_id = str(message['chat']['id'])
+                    
+                    # Check if chat is authorized
+                    if not self.is_authorized(chat_id):
+                        # Send unauthorized message
+                        username = message.get('chat', {}).get('username', 'Unknown')
+                        print(f"⚠️  Unauthorized access attempt from chat_id: {chat_id} (@{username})")
+                        self.send_message(
+                            "❌ Acesso não autorizado. Entre em contato com o administrador.",
+                            chat_id=chat_id
+                        )
                         continue
                     
                     text = message.get('text', '')
                     message_id = message['message_id']
-                    chat_id = str(message['chat']['id'])
                     
                     if text:
                         callback(text, message_id, chat_id)
@@ -302,13 +380,23 @@ class TelegramService:
                     if not message:
                         continue
                     
-                    # Only process messages from configured chat
-                    if str(message['chat']['id']) != str(self._chat_id):
+                    chat_id = str(message['chat']['id'])
+                    
+                    # Check if chat is authorized
+                    if not self.is_authorized(chat_id):
+                        username = message.get('chat', {}).get('username', 'Unknown')
+                        print(f"⚠️  Unauthorized access attempt from chat_id: {chat_id} (@{username})")
+                        await loop.run_in_executor(
+                            None,
+                            lambda c=chat_id: self.send_message(
+                                "❌ Acesso não autorizado. Entre em contato com o administrador.",
+                                chat_id=c
+                            )
+                        )
                         continue
                     
                     text = message.get('text', '')
                     message_id = message['message_id']
-                    chat_id = str(message['chat']['id'])
                     
                     if text:
                         # Run callback in executor (it may do blocking I/O)

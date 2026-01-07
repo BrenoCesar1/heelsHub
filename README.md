@@ -25,11 +25,19 @@
 ### 📥 Download de Vídeos
 - ✅ **Suporte multiplataforma**: Instagram, TikTok, Facebook, YouTube, Twitter
 - ✅ **Bot Telegram**: Envie link e receba o vídeo
+- ✅ **Multi-usuário**: Suporte a múltiplos usuários com histórico isolado
 - ✅ **Remoção de metadados**: ffmpeg para stealth mode
 - ✅ **Extração de descrição**: Mantém contexto original
 - ✅ **Upload automático**: Direto para TikTok após download
 - ✅ **Suporte a cookies**: Bypass de rate-limits do Instagram
 - ✅ **Anti-detecção**: User-agent e headers customizados
+
+### 👥 Multi-Usuário
+- ✅ **Suporte a equipes**: Configure múltiplos chat IDs autorizados
+- ✅ **Histórico isolado**: Cada usuário tem seu próprio histórico
+- ✅ **Segurança**: Bloqueio automático de usuários não autorizados
+- ✅ **Zero configuração**: Compatível com modo single-user
+- 📚 **Guia completo**: [MULTI_USER_SETUP.md](MULTI_USER_SETUP.md)
 
 ### ⚠️ Bloqueio do Instagram?
 Se downloads do Instagram falharem com erro de rate-limit/login:
@@ -122,9 +130,18 @@ VEO_ACCOUNT_3_PASSWORD=password3
 VEO_ACCOUNT_4_USERNAME=email4@gmail.com
 VEO_ACCOUNT_4_PASSWORD=password4
 
-# Telegram
+# Telegram Bot
 TELEGRAM_BOT_TOKEN=your_bot_token
+
+# Single user (backward compatible)
 TELEGRAM_CHAT_ID=your_chat_id
+
+# Multi-user support (recommended for teams)
+# Separate multiple IDs with commas
+TELEGRAM_AUTHORIZED_CHAT_IDS=id1,id2,id3
+
+# Use discover_chat_ids.py to find chat IDs
+# See MULTI_USER_SETUP.md for complete guide
 
 # TikTok API
 TIKTOK_CLIENT_KEY=your_client_key
@@ -159,6 +176,41 @@ python bots/link_downloader_bot.py
 - **Swagger UI**: http://localhost:8070/docs
 - **ReDoc**: http://localhost:8070/redoc
 - **Health Check**: http://localhost:8070/health
+
+---
+
+## 👥 Configuração Multi-Usuário
+
+O sistema suporta múltiplos usuários no Telegram, cada um com histórico isolado.
+
+### Descobrir Chat IDs
+
+```bash
+# Execute o script de descoberta
+python discover_chat_ids.py
+
+# Peça para cada membro da equipe enviar uma mensagem ao bot
+# Os chat IDs aparecerão automaticamente
+```
+
+### Configurar no .env
+
+```bash
+# Para múltiplos usuários:
+TELEGRAM_AUTHORIZED_CHAT_IDS=123456789,987654321,555666777
+
+# Ou para usuário único (compatibilidade):
+TELEGRAM_CHAT_ID=123456789
+```
+
+### Como Funciona
+
+- ✅ Cada usuário tem histórico **completamente isolado**
+- ✅ Vídeos enviados apenas para o chat correto
+- ✅ Usuários não autorizados são **automaticamente bloqueados**
+- ✅ Zero configuração adicional necessária
+
+📚 **Guia completo**: [MULTI_USER_SETUP.md](MULTI_USER_SETUP.md)
 
 ---
 
