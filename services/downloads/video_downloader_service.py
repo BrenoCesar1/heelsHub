@@ -160,6 +160,8 @@ class VideoDownloaderService:
             'noplaylist': True,
             'socket_timeout': 30,
             'retries': 3,
+            # Limit file size to 50MB (Telegram API limit and RAM safety)
+            'max_filesize': 50 * 1024 * 1024,
             # Anti-bot detection headers
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'referer': url,  # Set referer to the URL itself

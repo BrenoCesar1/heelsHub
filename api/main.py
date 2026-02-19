@@ -60,9 +60,30 @@ class EmbeddedLinkDownloaderBot:
         """Process incoming Telegram message."""
         print(f"\n📩 [Bot] New message from chat {chat_id}: {message_text[:50]}...")
         
+        # Command: /limpar (Manual Cleanup)
+        if message_text.lower().strip() == "/limpar":
+            self.telegram.send_message("🧹 Iniciando limpeza forçada...", chat_id=chat_id)
+            try:
+                # Force cleanup of ALL files (max_age_hours=0)
+                count = self.downloader.cleanup_old_files(max_age_hours=0)
+                self.telegram.send_message(
+                    f"✅ <b>Limpeza Concluída!</b>\n"
+                    f"🗑️ {count} arquivos temporários removidos.\n"
+                    f"💾 Espaço em disco liberado.",
+                    chat_id=chat_id
+                )
+            except Exception as e:
+                self.telegram.send_message(f"❌ Erro na limpeza: {e}", chat_id=chat_id)
+            return
+
         # Extract URL
         match = re.search(self.URL_PATTERN, message_text)
         if not match:
+            if not message_text.startswith('/'):
+                self.telegram.send_message(
+                    "⚠️ Não encontrei um link válido.\nEnvie um link do TikTok, Instagram, YouTube, etc.",
+                    chat_id=chat_id
+                )
             return
         
         url = match.group(0)
