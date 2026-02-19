@@ -8,6 +8,7 @@ import os
 import re
 import schedule
 import asyncio
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,9 @@ class EmbeddedLinkDownloaderBot:
         self.auto_upload = os.getenv('TIKTOK_AUTO_UPLOAD', 'false').lower() == 'true'
         self.tiktok_api = None
         
+        # Lock for concurrent processing (limit to 1 at a time)
+        self.processing_lock = threading.Lock()
+        
         if self.auto_upload:
             try:
                 self.tiktok_api = TikTokAPIService()
@@ -63,80 +67,104 @@ class EmbeddedLinkDownloaderBot:
         
         url = match.group(0)
         
-        if not self.downloader.is_supported(url):
-            platform = self.downloader.get_platform(url) or "unknown"
+        # Check processing lock
+        acquired = self.processing_lock.acquire(blocking=False)
+        if not acquired:
+            print(f"⏳ Busy processing another request. Queuing chat {chat_id}...")
             self.telegram.send_message(
-                f"❌ Unsupported platform: {platform}\n\n"
-                f"✅ Supported: Instagram, TikTok, Facebook, YouTube, Twitter",
+                "⏳ <b>Todos os processadores ocupados.</b>\nVocê está na fila, aguarde um momento...",
                 chat_id=chat_id
             )
-            return
-        
-        platform = self.downloader.get_platform(url)
-        self.telegram.send_message(
-            f"⬇️ Downloading from {platform}...\n⏳ Please wait...",
-            chat_id=chat_id
-        )
-        
-        video_info = self.downloader.download(url)
-        
-        if not video_info:
-            self.telegram.send_message("❌ Download failed", chat_id=chat_id)
-            return
-        
-        caption = self.formatter.format_download_caption(
-            title=video_info.title,
-            platform=video_info.platform,
-            duration=video_info.duration,
-            size_mb=video_info.size_mb
-        )
-        
-        success = self.telegram.send_video(video_info.filepath, caption, chat_id=chat_id)
-        
-        # Fallback: if video fails, try sending as document
-        if not success:
-            print(f"⚠️  Video send failed, trying as document...")
-            success = self.telegram.send_document(video_info.filepath, caption, chat_id=chat_id)
-            if not success:
+            # Wait for lock
+            self.processing_lock.acquire()
+            
+        try:
+            if not self.downloader.is_supported(url):
+                platform = self.downloader.get_platform(url) or "unknown"
                 self.telegram.send_message(
-                    f"❌ Failed to send video\n\n"
-                    f"📹 {video_info.title[:50]}\n"
-                    f"📏 {video_info.size_mb:.2f} MB\n"
-                    f"⏱️  {video_info.duration}s",
+                    f"❌ Unsupported platform: {platform}\n\n"
+                    f"✅ Supported: Instagram, TikTok, Facebook, YouTube, Twitter",
                     chat_id=chat_id
                 )
-        
-        if success:
-            description = video_info.description or video_info.title
-            if len(description) > 150:
-                description = description[:147] + "..."
+                return
             
-            if self.auto_upload and self.tiktok_api:
-                self.telegram.send_message("🚀 Uploading to TikTok...", chat_id=chat_id)
-                try:
-                    publish_id = self.tiktok_api.upload_video(
-                        video_path=video_info.filepath,
-                        title=description,
-                        privacy_level="SELF_ONLY"
-                    )
-                    if publish_id:
+            platform = self.downloader.get_platform(url)
+            self.telegram.send_message(
+                f"⬇️ Downloading from {platform}...\n⏳ Please wait...",
+                chat_id=chat_id
+            )
+            
+            video_info = None
+            try:
+                video_info = self.downloader.download(url)
+                
+                if not video_info:
+                    self.telegram.send_message("❌ Download failed", chat_id=chat_id)
+                    return
+                
+                caption = self.formatter.format_download_caption(
+                    title=video_info.title,
+                    platform=video_info.platform,
+                    duration=video_info.duration,
+                    size_mb=video_info.size_mb
+                )
+                
+                success = self.telegram.send_video(video_info.filepath, caption, chat_id=chat_id)
+                
+                # Fallback: if video fails, try sending as document
+                if not success:
+                    print(f"⚠️  Video send failed, trying as document...")
+                    success = self.telegram.send_document(video_info.filepath, caption, chat_id=chat_id)
+                    if not success:
                         self.telegram.send_message(
-                            f"✅ Uploaded to TikTok!\n🔒 As PRIVATE\n🆔 ID: {publish_id}",
+                            f"❌ Failed to send video\n\n"
+                            f"📹 {video_info.title[:50]}\n"
+                            f"📏 {video_info.size_mb:.2f} MB\n"
+                            f"⏱️  {video_info.duration}s",
                             chat_id=chat_id
                         )
-                except Exception as e:
-                    self.telegram.send_message(f"❌ TikTok error: {e}", chat_id=chat_id)
-            else:
-                self.telegram.send_message(
-                    f"✅ Vídeo baixado!\n\n📝 Descrição:\n{description}",
-                    chat_id=chat_id
-                )
-        
-        # Cleanup
-        try:
-            video_info.filepath.unlink()
-        except Exception:
-            pass
+                
+                if success:
+                    description = video_info.description or video_info.title
+                    if len(description) > 150:
+                        description = description[:147] + "..."
+                    
+                    if self.auto_upload and self.tiktok_api:
+                        self.telegram.send_message("🚀 Uploading to TikTok...", chat_id=chat_id)
+                        try:
+                            publish_id = self.tiktok_api.upload_video(
+                                video_path=video_info.filepath,
+                                title=description,
+                                privacy_level="SELF_ONLY"
+                            )
+                            if publish_id:
+                                self.telegram.send_message(
+                                    f"✅ Uploaded to TikTok!\n🔒 As PRIVATE\n🆔 ID: {publish_id}",
+                                    chat_id=chat_id
+                                )
+                        except Exception as e:
+                            self.telegram.send_message(f"❌ TikTok error: {e}", chat_id=chat_id)
+                    else:
+                        self.telegram.send_message(
+                            f"✅ Vídeo baixado!\n\n📝 Descrição:\n{description}",
+                            chat_id=chat_id
+                        )
+            
+            finally:
+                # Cleanup video file if it exists
+                if video_info and video_info.filepath.exists():
+                    try:
+                        video_info.filepath.unlink()
+                        print(f"   🧹 Cleanup: Removed {video_info.filepath.name}")
+                    except Exception as e:
+                        print(f"   ⚠️ Cleanup failed: {e}")
+
+        except Exception as e:
+            print(f"❌ Error handling message: {e}")
+            self.telegram.send_message(f"❌ Internal process error: {str(e)}", chat_id=chat_id)
+            
+        finally:
+            self.processing_lock.release()
 
 
 @asynccontextmanager
@@ -173,6 +201,10 @@ async def lifespan(app: FastAPI):
         if telegram_token and (telegram_chat or telegram_authorized):
             try:
                 bot = EmbeddedLinkDownloaderBot()
+                
+                # Schedule cleanup every hour
+                schedule.every(1).hours.do(bot.downloader.cleanup_old_files)
+                print("🧹 Scheduled temporary file cleanup (every 1h)")
                 
                 # Show configured users
                 authorized_ids = bot.telegram.get_authorized_chat_ids()
